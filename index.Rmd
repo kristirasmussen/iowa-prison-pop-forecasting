@@ -1,0 +1,141 @@
+---
+title: "Iowa Prison Population Growth Analysis"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    source_code: embed
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(echarts4r)
+library(dplyr)
+library(janitor)
+library(lubridate)
+library(timetk)
+library(shiny)
+library(plotly)
+
+
+load("./data/monthly_prison_pop.rda")
+```
+
+Dashboard {data-icon="ion-stats-bars"}
+=====================================
+
+Column {.sidebar data-width=200}
+-----------------------------------------------------------------------
+
+```{r}
+offenseTypes <- monthly_prison_pop %>%
+  select(offense_types) %>%
+  distinct() %>%
+  filter(!offense_types %in% c("None","No Charge", NA)) 
+
+selectInput("offenseType", label = h4("Offense Type"), 
+    choices = sort(offenseTypes$offense_types),
+    selected = "Drug",
+    multiple = TRUE)
+
+numericInput("popAdjustPct", 
+             label = h4("Population Adjustment Percent"), 
+             value = 0)
+
+```
+
+Column {data-width=450, data-height=150}
+-----------------------------------------------------------------------
+### Card 1
+
+```{r}
+
+```
+
+### Card 2
+
+```{r}
+
+```
+
+### Card 3
+
+```{r}
+
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+### Chart A
+
+```{r}
+total_prison_pop <- monthly_prison_pop %>% 
+  group_by(ds) %>% 
+  summarise(n = sum(n))
+```
+
+```{r}
+filterOffenseType <- reactive(input$offenseType)
+filterPopAdjust <- reactive(input$popAdjustPct)
+
+renderPlotly({
+
+  if (length(filterOffenseType()) == 5) {
+
+  monthly_prison_pop %>%
+    filter(ds > "2012-01-01") %>%
+    group_by(ds) %>%
+    summarise(count=sum(n)) %>%
+    arrange(ds) %>%
+    plot_ly(x = ~ds, y = ~ count, type = "scatter", mode='lines', marker = list(color = '#008ae6',
+                           line = list(color = '#008ae6', width = 2)), hoverinfo = "x+y") %>%
+    layout(xaxis = list(title = "Date"), 
+           yaxis = list(title = "Count of Incarcerated Individuals", rangemode = "tozero"),
+           title = "Monthly Prison Population for Selected Offense Types") 
+  } else {
+
+  fig <- monthly_prison_pop %>%
+    filter(ds > "2012-01-01") %>%
+    group_by(ds) %>%
+    summarise(count=sum(n)) %>%
+    arrange(ds) %>%
+    mutate(group = 'total') %>% 
+    bind_rows(
+      monthly_prison_pop %>%
+        filter(ds > "2012-01-01") %>%
+        filter(offense_types %in% filterOffenseType()) %>%
+        group_by(ds) %>%
+        summarise(count_sub=sum(n)) %>%
+        arrange(ds) %>%
+        mutate(group = 'selected_population')) %>% 
+    plot_ly(x = ~ds, y = ~ count, type = "scatter", mode='lines', marker = list(color = '#008ae6',
+                           line = list(color = '#008ae6', width = 2)), hoverinfo = "x+y") %>%
+    layout(xaxis = list(title = "Date"), 
+           yaxis = list(title = "Count of Incarcerated Individuals", rangemode = "tozero"),
+           title = "Monthly Prison Population for Selected Offense Types") 
+
+  fig <- fig %>% add_trace(y = ~count_sub, name = ~group, mode = 'lines+markers') 
+
+  }
+
+})
+
+# renderPlotly({
+#   monthly_prison_pop %>%
+#     filter(ds > "2012-01-01") %>%
+#     filter(offense_types %in% filterOffenseType()) %>%
+#     group_by(ds) %>%
+#     summarise(count=sum(n)) %>%
+#     arrange(ds) %>%
+#     plot_ly(x = ~ds, y = ~ count, type = "scatter", mode='lines', marker = list(color = '#008ae6',
+#                            line = list(color = '#008ae6', width = 2)), hoverinfo = "x+y") %>%
+#     layout(xaxis = list(title = "Date"), 
+#            yaxis = list(title = "Count of Incarcerated Individuals", rangemode = "tozero"),
+#            title = "Monthly Prison Population for Selected Offense Types")
+# })
+
+```
+
+About {data-icon="ion-stats-bars"}
+=====================================
