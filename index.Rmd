@@ -18,14 +18,17 @@ library(timetk)
 library(shiny)
 library(plotly)
 
-
 load("./data/monthly_prison_pop.rda")
+load("./data/all_data_forecast.rda")
+load("./data/all_data_forecast_offense_type.rda")
+load("./data/pre_covid_forecast.rda")
+load("./data/pre_covid_forecast_offense_type.rda")
 ```
 
 Dashboard {data-icon="ion-stats-bars"}
 =====================================
 
-Column {.sidebar data-width=200}
+Column {.sidebar data-width=250}
 -----------------------------------------------------------------------
 
 ```{r}
@@ -49,18 +52,55 @@ Column {data-width=450, data-height=150}
 ### Current Prison Population
 
 ```{r}
+currPop <- 10000
 
+renderValueBox({
+  valueBox(
+    value = format(currPop, nsmall=0, big.mark=","),
+    icon = "fa-users",
+    color = "primary"
+  )
+})
+
+# renderValueBox({
+#   rate <- formatC(downloadRate(), digits = 1, format = "f")
+#   valueBox(
+#     value = rate,
+#     icon = "fa-area-chart",
+#     color = if (rate >= input$rateThreshold) "warning" else "primary"
+#   )
+# })
 ```
 
 ### Projected +3 Year Prison Population
 
 ```{r}
 
+proj3YrPop <- 8000
+
+renderValueBox({
+  valueBox(
+    value = format(proj3YrPop, nsmall=0, big.mark=","),
+    icon = "fa-chart-bar",
+    color = if(proj3YrPop > currPop) "warning" else "primary"
+  )
+})
+
 ```
 
 ### Projected +10 Year Prison Population
 
 ```{r}
+
+proj10YrPop <- 12000
+
+renderValueBox({
+  valueBox(
+    value = format(proj10YrPop, nsmall=0, big.mark=","),
+    icon = "fa-chart-bar",
+    color = if(proj10YrPop > currPop) "warning" else "primary"
+  )
+})
 
 ```
 
@@ -120,21 +160,20 @@ renderPlotly({
 
 })
 
-# renderPlotly({
-#   monthly_prison_pop %>%
-#     filter(ds > "2012-01-01") %>%
-#     filter(offense_types %in% filterOffenseType()) %>%
-#     group_by(ds) %>%
-#     summarise(count=sum(n)) %>%
-#     arrange(ds) %>%
-#     plot_ly(x = ~ds, y = ~ count, type = "scatter", mode='lines', marker = list(color = '#008ae6',
-#                            line = list(color = '#008ae6', width = 2)), hoverinfo = "x+y") %>%
-#     layout(xaxis = list(title = "Date"), 
-#            yaxis = list(title = "Count of Incarcerated Individuals", rangemode = "tozero"),
-#            title = "Monthly Prison Population for Selected Offense Types")
-# })
-
 ```
 
 About {data-icon="ion-information-circled"}
 =====================================
+
+***
+
+### About the Project
+
+This interactive application uses publicly available data from [https://data.iowa.gov/](https://data.iowa.gov/) to forecast Iowa Prison Populations.  
+
+Contributors:  
+William Ebert, Greyson Henderson, Shivani Kharbanda, Kristi Rasmussen, Grant Ruedy, Husam Yassin
+
+All source code can be found [here](https://github.com/kristirasmussen/iowa-prison-pop-forecasting) on GitHub.
+
+*Note: This project was completed for the Georgia Tech Data & Visual Analytics Fall 2021 course.*
