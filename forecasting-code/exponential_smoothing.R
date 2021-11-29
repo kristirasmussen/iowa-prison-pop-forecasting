@@ -1,30 +1,44 @@
+# Loading library
 library(tidyverse)
 library(tidyquant)
 library(timetk)
 library(sweep)
 library(forecast)
 
-load("/Users/grantruedy/Georgia_Tech/CSE_6242/Project/monthly_prison_pop.rda")
+# Loading data
+load("./data/monthly_prison_pop.rda")
 
-df <- monthly_prison_pop %>% group_by(ds) %>% summarize(count = sum(n))
+# df <- monthly_prison_pop %>% group_by(ds) %>% summarize(count = sum(n))
 
+length(unique(monthly_prison_pop$offense_classifications))
 table(monthly_prison_pop$offense_classifications)
 
-ts1 <- ts(df$count, start=2010, freq=12)
-plot(ts1, main='Prison Population Over Time', ylab='Population')
+# Filtering Other misdemanor for now, because of low frequency (only 1)
+df <- monthly_prison_pop %>% 
+  filter(!offense_classifications %in% 'Other Misdemeanor')
+table(df$offense_classifications)
 
-df_grouped <- monthly_prison_pop %>% rename(date = ds) %>%
-  unite(Merged, c(offense_classifications,offense_types), sep = "-") %>%
-  group_by(date, Merged) %>% 
+
+#ts1 <- ts(df$count, start=2010, freq=12)
+#plot(ts1, main='Prison Population Over Time', ylab='Population')
+
+# aggregate offense_classifications and offense_types in one column and sum up the population
+df_grouped <- df %>% rename(date = ds) %>%
+  unite(offesnse_category, c(offense_classifications,offense_types), sep = "-") %>%
+  group_by(date, offesnse_category) %>% 
   summarize(count = sum(n))
 
-unique((monthly_prison_pop$offense_subtypes))
+# save final data before forecasting
+save(df_grouped, file = './data/final_data_before_model.rda')
 
 
-table(df_grouped$Merged)
+# Check for unique offense category length
+length(unique((df_grouped$offesnse_category)))
+
+sort(table(df_grouped$offesnse_category))
 
 df_nested <- df_grouped %>%
-  group_by(Merged) %>%
+  group_by(offesnse_category) %>%
   nest()
 
 df_ts <- df_nested %>%
@@ -43,7 +57,7 @@ df_fit <- df_ts %>%
 df_fit %>%
   mutate(tidy = map(fit.ets, sw_tidy)) %>%
   unnest(tidy) %>%
-  spread(key = Merged, value = estimate)
+  spread(key = offesnse_category, value = estimate)
 
 
 #sw_augment
@@ -53,14 +67,14 @@ df_ets <- df_fit %>%
 
 
 df_ets %>%
-  ggplot(aes(x = date, y = .resid, group = Merged)) +
+  ggplot(aes(x = date, y = .resid, group = offesnse_category)) +
   geom_hline(yintercept = 0, color = "grey40") +
   geom_line(color = palette_light()[[2]]) +
   geom_smooth(method = "loess") +
   labs(title = "Bike Quantity Sold By Secondary Category",
        subtitle = "ETS Model Residuals", x = "") + 
   theme_tq() +
-  facet_wrap(~ Merged, scale = "free_y", ncol = 3) +
+  facet_wrap(~ offesnse_category, scale = "free_y", ncol = 3) +
   scale_x_date(date_labels = "%Y")
 
 
@@ -74,18 +88,25 @@ df_tidy <- df_forecast %>%
   unnest(sweep)
 
 
-df_new <- df_tidy %>% select(Merged, count, key, index, lo.95, hi.95)
+df_new <- df_tidy %>% select(offesnse_category, count, key, index, lo.95, hi.95)
 
-all_data_forecast_offense_type <- df_new %>% separate(Merged, into = c('offense_classifications', 'offense_types'), 
+
+################ Data saving ####################################################################
+all_data_forecast_offense_type <- df_new %>% separate(offesnse_category, into = c('offense_classifications', 'offense_types'), 
                     sep = "-") 
 
 save(all_data_forecast_offense_type, file='all_data_forecast_offense_type.rda')
 
-pre_covid_forecast_offense_type <- df_new %>% separate(Merged, into = c('offense_classifications', 'offense_types'), 
+pre_covid_forecast_offense_type <- df_new %>% separate(offesnse_category, into = c('offense_classifications', 'offense_types'), 
                                           sep = "-") 
 
 save(pre_covid_forecast_offense_type, file='pre_covid_forecast_offense_type.rda')
+#####################################################################################################
 
+
+
+
+############ Plotting #################################################################################
 split_df %>%
   ggplot(aes(x = index, y = count, color = key, group = offense_classifications)) +
   geom_ribbon(aes(ymin = lo.95, ymax = hi.95), 
@@ -102,3 +123,4 @@ split_df %>%
   facet_wrap(~ offense_classifications, scales = "free_y", ncol = 3) +
   theme_tq() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+##########################################################################################################
