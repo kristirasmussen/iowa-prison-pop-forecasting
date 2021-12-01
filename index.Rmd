@@ -4,7 +4,7 @@ output:
   flexdashboard::flex_dashboard:
     orientation: rows
     vertical_layout: fill
-    source_code: embed
+    source_code: https://github.com/kristirasmussen/iowa-prison-pop-forecasting/
 runtime: shiny
 ---
 
@@ -14,15 +14,12 @@ library(echarts4r)
 library(dplyr)
 library(janitor)
 library(lubridate)
-library(timetk)
+# library(timetk)
 library(shiny)
 library(plotly)
 
-load("./data/monthly_prison_pop.rda")
-load("./data/all_data_forecast.rda")
-load("./data/all_data_forecast_offense_type.rda")
-load("./data/pre_covid_forecast.rda")
-load("./data/pre_covid_forecast_offense_type.rda")
+load("./data/arima_with_seasonality_after_2012.rda") 
+monthly_prison_pop <- df_new
 ```
 
 Dashboard {data-icon="ion-stats-bars"}
@@ -33,17 +30,48 @@ Column {.sidebar data-width=250}
 
 ```{r}
 offenseTypes <- monthly_prison_pop %>%
-  select(offense_types) %>%
-  distinct() %>%
-  filter(!offense_types %in% c("None","No Charge", NA)) 
+  select(offesnse_category) %>%
+  distinct() #%>%
+  # filter(!offesnse_category %in% c("None","No Charge", NA)) 
 
 selectInput("offenseType", label = h4("Offense Type"), 
-    choices = sort(offenseTypes$offense_types),
-    multiple = TRUE)
+    choices = sort(offenseTypes$offesnse_category),
+    selected = 'A Felony-Violent',
+    multiple = F)
 
 numericInput("popAdjustPct", 
              label = h4("Population Adjustment Percent"), 
              value = 0)
+
+filterOffenseType <- reactive(input$offenseType)
+filterPopAdjust <- reactive(input$popAdjustPct)
+
+currPop <- reactive(monthly_prison_pop %>% 
+                      ungroup() %>% 
+                      filter(key == 'actual') %>% 
+                      filter(index == max(index)) %>% 
+                      filter(offesnse_category %in% filterOffenseType()) %>% 
+                      dplyr::group_by(index) %>% 
+                      dplyr::summarise(count = sum(count))
+                    )
+
+proj3YrPop <- reactive(monthly_prison_pop %>% 
+                          ungroup() %>% 
+                          filter(key == 'forecast') %>% 
+                          filter(index == floor_date(Sys.Date(),'month') + months(36)) %>% 
+                          filter(offesnse_category %in% filterOffenseType()) %>% 
+                          dplyr::group_by(index) %>% 
+                          dplyr::summarise(count = sum(count))
+                    )
+
+proj10YrPop <- reactive(monthly_prison_pop %>% 
+                          ungroup() %>% 
+                          filter(key == 'forecast') %>% 
+                          filter(index == floor_date(Sys.Date(),'month') + months(120)) %>%
+                          filter(offesnse_category %in% filterOffenseType()) %>% 
+                          dplyr::group_by(index) %>% 
+                          dplyr::summarise(count = sum(count))  
+                    )
 
 ```
 
@@ -52,11 +80,13 @@ Column {data-width=450, data-height=150}
 ### Current Prison Population
 
 ```{r}
-currPop <- 10000
+
+
 
 renderValueBox({
+  
   valueBox(
-    value = format(currPop, nsmall=0, big.mark=","),
+    value = format(round(currPop()$count,0), nsmall=0, big.mark=","),
     icon = "fa-users",
     color = "primary"
   )
@@ -76,13 +106,11 @@ renderValueBox({
 
 ```{r}
 
-proj3YrPop <- 8000
-
 renderValueBox({
   valueBox(
-    value = format(proj3YrPop, nsmall=0, big.mark=","),
+    value = format(round(proj3YrPop()$count,0), nsmall=0, big.mark=","),
     icon = "fa-chart-bar",
-    color = if(proj3YrPop > currPop) "warning" else "primary"
+    color = if(proj3YrPop()$count > currPop()$count) "warning" else "primary"
   )
 })
 
@@ -92,13 +120,13 @@ renderValueBox({
 
 ```{r}
 
-proj10YrPop <- 12000
+
 
 renderValueBox({
   valueBox(
-    value = format(proj10YrPop, nsmall=0, big.mark=","),
+    value = format(round(proj10YrPop()$count,0), nsmall=0, big.mark=","),
     icon = "fa-chart-bar",
-    color = if(proj10YrPop > currPop) "warning" else "primary"
+    color = if(proj10YrPop()$count > currPop()$count) "warning" else "primary"
   )
 })
 
@@ -109,54 +137,24 @@ Column {data-width=350}
 
 ### 
 
-```{r}
-total_prison_pop <- monthly_prison_pop %>% 
-  group_by(ds) %>% 
-  summarise(n = sum(n))
-```
 
 ```{r}
-filterOffenseType <- reactive(input$offenseType)
-filterPopAdjust <- reactive(input$popAdjustPct)
 
 renderPlotly({
 
-  if (length(filterOffenseType()) == 5) {
-
-  monthly_prison_pop %>%
-    filter(ds > "2012-01-01") %>%
-    group_by(ds) %>%
-    summarise(count=sum(n)) %>%
-    arrange(ds) %>%
-    plot_ly(x = ~ds, y = ~ count, type = "scatter", mode='lines', hoverinfo = "x+y") %>%
+  fig <- monthly_prison_pop %>%
+    filter(index > "2012-01-01") %>%
+    filter(offesnse_category %in% filterOffenseType()) %>%
+    arrange(index) %>%
+    plot_ly(x = ~index, y = ~ count, type = "scatter", mode='lines', hoverinfo = "x+y") %>%
     layout(xaxis = list(title = "Date"), 
            yaxis = list(title = "Count of Incarcerated Individuals", rangemode = "tozero")
-           ,title = "Monthly Prison Population for Selected Offense Types") 
-  } else {
-
-  fig <- monthly_prison_pop %>%
-    filter(ds > "2012-01-01") %>%
-    group_by(ds) %>%
-    summarise(count=sum(n)) %>%
-    arrange(ds) %>%
-    mutate(group = 'total') %>% 
-    bind_rows(
-      monthly_prison_pop %>%
-        filter(ds > "2012-01-01") %>%
-        filter(offense_types %in% filterOffenseType()) %>%
-        group_by(ds) %>%
-        summarise(count_sub=sum(n)) %>%
-        arrange(ds) %>%
-        mutate(group = 'selected_population')) %>% 
-    plot_ly(x = ~ds, y = ~ count, type = "scatter", mode='lines', hoverinfo = "x+y", 
-                           name = ~group) %>%
-    layout(xaxis = list(title = "Date"), 
-           yaxis = list(title = "Count of Incarcerated Individuals", rangemode = "tozero"),
-           title = "Monthly Prison Population for Selected Offense Types") 
-
-  fig <- fig %>% add_trace(y = ~count_sub, name = ~group, mode = 'lines') 
-
-  }
+           ,title = "All Data Predictions - Aggravated Misdemeanor - Other")
+  
+  fig <- fig %>% add_trace(y = ~hi.95, mode = 'lines') 
+  fig <- fig %>% add_trace(y = ~lo.95, mode = 'lines')
+    
+  fig
 
 })
 
