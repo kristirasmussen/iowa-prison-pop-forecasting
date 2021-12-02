@@ -106,7 +106,7 @@ renderValueBox({
   
   valueBox(
     value = format(round(currPop()$count,0), nsmall=0, big.mark=","),
-    #icon = "fa-users",
+    icon = "fa-users",
     color = "primary"
   )
 })
@@ -128,7 +128,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
     value = format(round(proj3YrPop()$count,0), nsmall=0, big.mark=","),
-    #icon = "fa-chart-bar",
+    icon = "fa-chart-bar",
     color = if(proj3YrPop()$count > currPop()$count) "warning" else "primary"
   )
 })
@@ -142,7 +142,7 @@ renderValueBox({
 renderValueBox({
   valueBox(
     value = format(round(proj10YrPop()$count,0), nsmall=0, big.mark=","),
-    #icon = "fa-chart-bar",
+    icon = "fa-chart-bar",
     color = if(proj10YrPop()$count > currPop()$count) "warning" else "primary"
   )
 })
@@ -167,14 +167,15 @@ renderPlotly({
     mutate(count = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), count * filterPopAdjustPct(), count),0)) %>%
     mutate(hi.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), hi.95 * filterPopAdjustPct(), hi.95),0)) %>%
     mutate(lo.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), lo.95 * filterPopAdjustPct(), lo.95),0)) %>%
-    plot_ly(x = ~index, y = ~ hi.95, type = "scatter", mode='lines', line = list(color = 'transparent'), hoverinfo = "x+y", name='Upper 95% CI') %>%
+    #Upper 95% Confidence Line
+    plot_ly(x = ~index, y = ~ hi.95, type = "scatter", mode='lines', line = list(color = 'transparent'), hoverinfo = "x+y", showlegend = F) %>% 
     layout(xaxis = list(title = "Date"), 
            yaxis = list(title = "Count of Incarcerated Individuals", rangemode = "tozero")
-           ,title = "All Data Predictions - Aggravated Misdemeanor - Other")
-
+           ,title = paste0("All Data Predictions - ", filterOffenseType(), " (with 95% CI)"))
+  #Lower 95% Confidence Line
   fig <- fig %>% 
-    add_trace(y = ~lo.95, mode = 'lines', fill = 'tonexty', fillcolor='rgba(0,100,80,0.2)', line = list(color = 'transparent'), name='Lower 95% CI') 
-  
+    add_trace(y = ~lo.95, mode = 'lines', fill = 'tonexty', fillcolor='rgba(0,100,80,0.2)', line = list(color = 'transparent')) 
+  #Forecast Line
   fig <- fig %>%
     add_trace(y = ~count, mode = 'lines', line = list(color='rgb(0,100,80)'), name='Forecast')
 
@@ -185,7 +186,7 @@ renderPlotly({
 ```
 
 
-Column {data-width=150}
+Column {data-width=150, data-height=150}
 -----------------------------------------------------------------------
 
 ```{r}
@@ -194,19 +195,24 @@ Column {data-width=150}
 raceSplits <- reactive({
   df <- monthly_prison_pop %>%
           unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
-          #dplyr::filter(offense_category %in% filterOffenseType()) %>% 
-          dplyr::filter(offense_category=='A Felony-Violent') %>% 
+          dplyr::filter(offense_category %in% filterOffenseType()) %>% 
+          #dplyr::filter(offense_category=='A Felony-Violent') %>% 
           dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years??
           dplyr::group_by(offense_category, race_ethnicity) %>%
           dplyr::summarise(n = sum(n)) %>% # we'll want to divide to get the monthly amount here too??
-          dplyr::mutate(prop = n/sum(n))%>%
+          dplyr::mutate(percent = n/sum(n))%>%
           dplyr::ungroup() %>%
-          dplyr::select(race_ethnicity, n, prop) %>%
+          dplyr::select(race_ethnicity, n, percent) %>%
           #pivot_wider(names_from = race_ethnicity, values_from = prop) %>%
           replace(is.na(.),0) %>%
-          column_to_rownames('race_ethnicity')
+          column_to_rownames('race_ethnicity') %>%
+          dplyr::mutate(percent = scales::percent(percent))
   
-  df <- t(df) %>% as_tibble()
+  df <- df %>% dplyr::mutate_if(is.numeric, as.character) %>%
+          t() %>% 
+          as.data.frame() %>%
+          rownames_to_column('Metric')
+
   })
 
 # raceProp <- reactive(raceSplits %>%
@@ -220,16 +226,40 @@ raceSplits <- reactive({
 #                        )
 
 
-genderSplits <- reactive(monthly_prison_pop %>%
-                    unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
-                    dplyr::filter(offense_category %in% filterOffenseType()) %>% 
-                    dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years??
-                    dplyr::group_by(offense_category, sex) %>%
-                    dplyr::summarise(n = sum(n)) %>% # we'll want to divide to get the monthly amount here too??
-                    dplyr::mutate(prop = n/sum(n))%>%
-                    #dplyr::select(c(offense_category, sex, prop)) %>%
-                    #pivot_wider(names_from = sex, values_from = prop) %>%
-                    replace(is.na(.),0))
+# genderSplits <- reactive(monthly_prison_pop %>%
+#                     unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
+#                     dplyr::filter(offense_category %in% filterOffenseType()) %>% 
+#                     dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years??
+#                     dplyr::group_by(offense_category, sex) %>%
+#                     dplyr::summarise(n = sum(n)) %>% # we'll want to divide to get the monthly amount here too??
+#                     dplyr::mutate(prop = n/sum(n))%>%
+#                     #dplyr::select(c(offense_category, sex, prop)) %>%
+#                     #pivot_wider(names_from = sex, values_from = prop) %>%
+#                     replace(is.na(.),0))
+
+genderSplits <- reactive({
+  df <- monthly_prison_pop %>%
+          unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
+          dplyr::filter(offense_category %in% filterOffenseType()) %>% 
+          #dplyr::filter(offense_category=='A Felony-Violent') %>% 
+          dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years??
+          dplyr::group_by(offense_category, sex) %>%
+          dplyr::summarise(n = sum(n)) %>% # we'll want to divide to get the monthly amount here too??
+          dplyr::mutate(percent = n/sum(n))%>%
+          dplyr::ungroup() %>%
+          dplyr::select(sex, n, percent) %>%
+          #pivot_wider(names_from = race_ethnicity, values_from = prop) %>%
+          replace(is.na(.),0) %>%
+          column_to_rownames('sex') %>%
+          dplyr::mutate(percent = scales::percent(percent))
+  
+  df <- df %>% dplyr::mutate_if(is.numeric, as.character) %>%
+          t() %>% 
+          as.data.frame() %>%
+          rownames_to_column('Metric')
+
+  })
+
 # renderTable(genderSplits)
 
 
@@ -261,7 +291,7 @@ genderSplits <- reactive(monthly_prison_pop %>%
 
 renderDataTable(raceSplits(), 
                 escape = TRUE, 
-                options = list(scrollX=FALSE, autoWidth=TRUE, autoHeight=TRUE, paging=FALSE, info=FALSE, searching=FALSE, ordering=FALSE))
+                options = list(scrollX=TRUE, autoWidth=TRUE, autoHeight=TRUE, paging=FALSE, info=FALSE, searching=FALSE, ordering=FALSE))
 
 ```
 
@@ -271,7 +301,7 @@ renderDataTable(raceSplits(),
 
 renderDataTable(genderSplits(), 
                 escape = TRUE, 
-                options = list(scrollX=FALSE, autoWidth=TRUE, autoHeight=TRUE, paging=FALSE, info=FALSE, searching=FALSE, ordering=FALSE))
+                options = list(scrollX=TRUE, autoWidth=TRUE, autoHeight=TRUE, paging=FALSE, info=FALSE, searching=FALSE, ordering=FALSE))
 
 
 ```
