@@ -154,18 +154,18 @@ renderPlotly({
     filter(offesnse_category %in% filterOffenseType()) %>%
     arrange(index) %>%
     mutate(count = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), count * filterPopAdjustPct(), count),0)) %>%
-    plot_ly(x = ~index, y = ~ count, type = "scatter", mode='lines', hoverinfo = "x+y", name='Forecast') %>%
+    mutate(hi.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), hi.95 * filterPopAdjustPct(), hi.95),0)) %>%
+    mutate(lo.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), lo.95 * filterPopAdjustPct(), lo.95),0)) %>%
+    plot_ly(x = ~index, y = ~ hi.95, type = "scatter", mode='lines', line = list(color = 'transparent'), hoverinfo = "x+y", name='Upper 95% CI') %>%
     layout(xaxis = list(title = "Date"), 
            yaxis = list(title = "Count of Incarcerated Individuals", rangemode = "tozero")
            ,title = "All Data Predictions - Aggravated Misdemeanor - Other")
 
   fig <- fig %>% 
-    mutate(hi.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), hi.95 * filterPopAdjustPct(), hi.95),0)) %>%
-    add_trace(y = ~hi.95, mode = 'lines', name='Upper 95% CI') 
+    add_trace(y = ~lo.95, mode = 'lines', fill = 'tonexty', fillcolor='rgba(0,100,80,0.2)', line = list(color = 'transparent'), name='Lower 95% CI') 
   
   fig <- fig %>%
-    mutate(lo.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), lo.95 * filterPopAdjustPct(), lo.95),0)) %>%
-    add_trace(y = ~lo.95, mode = 'lines', name='Lower 95% CI')
+    add_trace(y = ~count, mode = 'lines', line = list(color='rgb(0,100,80)'), name='Forecast')
 
   fig
 

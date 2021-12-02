@@ -5,6 +5,9 @@ library(timetk)
 library(sweep)
 library(forecast)
 
+# import functions
+source('utils.R')
+
 # Loading data
 load("./data/monthly_prison_pop.rda")
 
@@ -15,26 +18,27 @@ table(monthly_prison_pop$offense_classifications)
 
 # Filtering Other misdemanor for now, because of low frequency (only 1)
 df <- monthly_prison_pop %>% 
-  filter(!offense_classifications %in% 'Other Misdemeanor')
-table(df$offense_classifications)
+  filter(!offense_classifications %in% c("None","No Charge", 'Other Misdemeanor', 'Felony - Enhancement to Original Penalty', NA))
+# table(df$offense_classifications)
 
 
 #ts1 <- ts(df$count, start=2010, freq=12)
 #plot(ts1, main='Prison Population Over Time', ylab='Population')
 
 # aggregate offense_classifications and offense_types in one column and sum up the population
-df_grouped <- df %>% rename(date = ds) %>%
+df_grouped <- df %>% 
+  rename(date = ds) %>%
   unite(offesnse_category, c(offense_classifications,offense_types), sep = "-") %>%
   group_by(date, offesnse_category) %>% 
   summarize(count = sum(n))
 
 df_grouped <- df_grouped %>% 
   filter(!offesnse_category %in% c('Simple Misdemeanor-Property','NA-No Charge')) %>% 
-  filter(date <= '2020-01-01') %>% 
-  filter(date > '2012-01-01')
+  # filter(date <= '2020-01-01') %>% 
+  filter(date >= as.Date('2012-01-01'))
+
 # save final data before forecasting
 save(df_grouped, file = './data/final_data_before_model.rda')
-
 
 # Check for unique offense category length
 length(unique((df_grouped$offesnse_category)))
@@ -43,7 +47,8 @@ sort(table(df_grouped$offesnse_category))
 
 df_nested <- df_grouped %>%
   group_by(offesnse_category) %>%
-  nest()
+  nest() %>% 
+  mutate(data = map(data, fill_dates))
 
 df_ts <- df_nested %>%
   mutate(data.ts = map(.x       = data, 
@@ -94,13 +99,13 @@ df_tidy <- df_forecast %>%
 
 df_new <- df_tidy %>% select(offesnse_category, count, key, index, lo.95, hi.95)
 
-
+save(df_grouped, file = './data/arima_with_seasonality_after_2012.rda')
 
 ############ Plotting #################################################################################
 ##########################################################################################################
-Aggravated Misdemeanor-Other
+# Aggravated Misdemeanor-Other
 
-df_new %>% filter(offesnse_category %in% 'Aggravated Misdemeanor-Other') %>%
+df_new %>% filter(offesnse_category %in% 'Aggravated Misdemeanor-Other') %>% 
   ggplot(aes(x = index, y = count, color = key)) +
   geom_ribbon(aes(ymin = lo.95, ymax = hi.95), 
               fill = "#D5DBFF", color = NA, size = 0) +
