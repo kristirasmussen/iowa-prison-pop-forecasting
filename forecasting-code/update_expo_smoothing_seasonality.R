@@ -99,7 +99,7 @@ df_tidy <- df_forecast %>%
 
 df_new <- df_tidy %>% select(offesnse_category, count, key, index, lo.95, hi.95)
 
-save(df_grouped, file = './data/arima_with_seasonality_after_2012.rda')
+save(df_new, file = './data/arima_with_seasonality_after_2012.rda')
 
 ############ Plotting #################################################################################
 ##########################################################################################################
