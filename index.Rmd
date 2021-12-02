@@ -14,12 +14,22 @@ library(echarts4r)
 library(dplyr)
 library(janitor)
 library(lubridate)
+library(tidyverse)
 # library(timetk)
 library(shiny)
 library(plotly)
 
+# Historical Exploded Data
+load("./data/monthly_prison_pop.rda")
+
+# Forecast Data
 load("./data/arima_with_seasonality_after_2012.rda") 
 forecast_prison_pop <- df_new
+
+# Identify first forecast data for Adjustment Start Date filtering functionality
+firstForecastDate <- forecast_prison_pop %>%
+                        filter(key == 'forecast') %>%
+                        dplyr::summarise(startDate = min(index))
 ```
 
 Dashboard {data-icon="ion-stats-bars"}
@@ -86,7 +96,7 @@ proj10YrPop <- reactive(forecast_prison_pop %>%
 
 ```
 
-Column {data-width=450, data-height=150}
+Column {data-width=450, data-height=85}
 -----------------------------------------------------------------------
 ### Current Prison Population
 
@@ -136,6 +146,40 @@ renderValueBox({
     color = if(proj10YrPop()$count > currPop()$count) "warning" else "primary"
   )
 })
+
+```
+
+Column {data-width=450, data-height=90}
+-----------------------------------------------------------------------
+### 
+
+```{r}
+genderSplits <- monthly_prison_pop %>%
+                    unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
+                    dplyr::filter(offense_category == "A Felony-Violent") %>%
+                    dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years??
+                    dplyr::group_by(offense_category, sex) %>%
+                    # now figure out how to do an average gender split over the last 3 years, or something like that
+                    dplyr::summarise(total_pop = sum(n)) %>% # we'll want to divide to get the monthly amount here too??
+                    pivot_wider(names_from = sex, values_from = total_pop) %>%
+                    replace(is.na(.),0) %>%
+                    dplyr::mutate(pct_male = Male / (Male + Female))
+
+# renderTable(genderSplits)
+
+renderDataTable(genderSplits, 
+                escape = TRUE, 
+                options = list(scrollX=FALSE, autoWidth=TRUE, paging=FALSE, info=FALSE, searching=FALSE, ordering=FALSE))
+
+# renderDataTable(genderSplits,
+#                 options = list(
+#                   iDisplayLength=1,
+#                   bLengthChange=0,
+#                   bPaginate=0,
+#                   bFilter=0,
+#                   bInfo=0,
+#                   bAutoWidth=1
+#                 ))
 
 ```
 
