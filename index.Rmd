@@ -3,7 +3,7 @@ title: "Iowa Prison Population Growth Analysis"
 output: 
   flexdashboard::flex_dashboard:
     orientation: rows
-    vertical_layout: fill
+    vertical_layout: scroll
     source_code: https://github.com/kristirasmussen/iowa-prison-pop-forecasting/
 runtime: shiny
 ---
@@ -96,7 +96,7 @@ proj10YrPop <- reactive(forecast_prison_pop %>%
 
 ```
 
-Column {data-width=450, data-height=85}
+Column {data-width=450, data-height=100}
 -----------------------------------------------------------------------
 ### Current Prison Population
 
@@ -150,7 +150,7 @@ renderValueBox({
 ```
 
 
-Column {data-width=350}
+Column {data-width=350, data-height=500}
 -----------------------------------------------------------------------
 
 ### 
@@ -186,11 +186,11 @@ renderPlotly({
 ```
 
 
-Column {data-width=150, data-height=150}
+Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
 ```{r}
-
+#Column {data-width=150}
 
 raceSplits <- reactive({
   df <- monthly_prison_pop %>%
@@ -292,6 +292,7 @@ genderSplits <- reactive({
 renderDataTable(raceSplits(), 
                 escape = TRUE, 
                 options = list(scrollX=TRUE, autoWidth=TRUE, autoHeight=TRUE, paging=FALSE, info=FALSE, searching=FALSE, ordering=FALSE))
+
 
 ```
 
