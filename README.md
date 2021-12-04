@@ -11,5 +11,5 @@ This collection of files follows the standard R Project implmentation documented
 - Data is updated on a monthly basis and stored within the "data" folder of this project.
 
 ### Execution:  
-- In order to run a demo of our dashboard, the existing code is published to shinyapps.io [here](https://iowa-prison-forecast.shinyapps.io/iowa-prison-pop-forecasting/)
-- Alternatively, if a user wishes to run the dashboard locally from RStudio, users simply need to open the index.Rmd file and "Run Document" to render the dashboard.
+- In order to run a demo of our dashboard, the existing project code is published to shinyapps.io [here](https://iowa-prison-forecast.shinyapps.io/iowa-prison-pop-forecasting/)
+- Alternatively, if a user wishes to run the dashboard locally from RStudio, users simply need to open the index.Rmd file and "Run Document" from the RStudio user interfact to render the dashboard.
