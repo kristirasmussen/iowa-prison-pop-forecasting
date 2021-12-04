@@ -12,9 +12,3 @@ All code is written in the R programming language and, due to packages used with
 ### Execution:  
 - In order to run a demo of our dashboard, the existing code is published to shinyapps.io [here](https://iowa-prison-forecast.shinyapps.io/iowa-prison-pop-forecasting/)
 - Alternatively, if a user wishes to run the dashboard locally from RStudio, users simply need to open the index.Rmd file and "Run Document" to render the dashboard.
-
-
-README.txt - a concise, short README.txt file, corresponding to the "user guide". This file should contain:
-DESCRIPTION - Describe the package in a few paragraphs
-INSTALLATION - How to install and setup your code
-EXECUTION - How to run a demo on your code
