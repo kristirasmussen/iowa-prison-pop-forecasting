@@ -192,17 +192,20 @@ Column {.tabset .tabset-fade}
 ```{r}
 #Column {data-width=150}
 
+months_back = 36
+
 raceSplits <- reactive({
   df <- monthly_prison_pop %>%
           unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
           dplyr::filter(offense_category %in% filterOffenseType()) %>% 
           #dplyr::filter(offense_category=='A Felony-Violent') %>% 
-          dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years??
+          dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(months_back)) %>% #limit to last 3 years??
           dplyr::group_by(offense_category, race_ethnicity) %>%
-          dplyr::summarise(n = sum(n)) %>% # we'll want to divide to get the monthly amount here too??
-          dplyr::mutate(percent = n/sum(n))%>%
+          dplyr::summarise(n = sum(n)) %>%
+          dplyr::mutate(percent = n/sum(n))%>% 
+          dplyr::mutate(avg_population = round(n/(months_back+1))) %>% #divide by number of months in window to get avg
           dplyr::ungroup() %>%
-          dplyr::select(race_ethnicity, n, percent) %>%
+          dplyr::select(race_ethnicity, avg_population, percent) %>%
           #pivot_wider(names_from = race_ethnicity, values_from = prop) %>%
           replace(is.na(.),0) %>%
           column_to_rownames('race_ethnicity') %>%
@@ -244,10 +247,11 @@ genderSplits <- reactive({
           #dplyr::filter(offense_category=='A Felony-Violent') %>% 
           dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years??
           dplyr::group_by(offense_category, sex) %>%
-          dplyr::summarise(n = sum(n)) %>% # we'll want to divide to get the monthly amount here too??
+          dplyr::summarise(n = sum(n)) %>%
           dplyr::mutate(percent = n/sum(n))%>%
+          dplyr::mutate(avg_population = round(n/(months_back+1))) %>%#divide by number of months in window to get avg
           dplyr::ungroup() %>%
-          dplyr::select(sex, n, percent) %>%
+          dplyr::select(sex, avg_population, percent) %>%
           #pivot_wider(names_from = race_ethnicity, values_from = prop) %>%
           replace(is.na(.),0) %>%
           column_to_rownames('sex') %>%
