@@ -23,7 +23,7 @@ library(plotly)
 load("./data/monthly_prison_pop.rda")
 
 # Forecast Data
-load("./data/arima_with_seasonality_after_2012.rda") 
+load("./data/arima_without_seasonality_after_2012_zeros.rda") 
 forecast_prison_pop <- df_new
 
 # Identify first forecast data for Adjustment Start Date filtering functionality
@@ -40,12 +40,12 @@ Column {.sidebar data-width=250}
 
 ```{r}
 offenseTypes <- forecast_prison_pop %>%
-  select(offesnse_category) %>%
+  select(offense_category) %>%
   distinct() #%>%
-  # filter(!offesnse_category %in% c("None","No Charge", NA)) 
+  # filter(!offense_category %in% c("None","No Charge", NA)) 
 
 selectInput("offenseType", label = h4("Offense Type"), 
-    choices = sort(offenseTypes$offesnse_category),
+    choices = sort(offenseTypes$offense_category),
     selected = 'A Felony-Violent',
     multiple = F)
 
@@ -69,7 +69,7 @@ currPop <- reactive(forecast_prison_pop %>%
                       ungroup() %>% 
                       filter(key == 'actual') %>% 
                       filter(index == max(index)) %>% 
-                      filter(offesnse_category %in% filterOffenseType()) %>% 
+                      filter(offense_category %in% filterOffenseType()) %>% 
                       dplyr::group_by(index) %>% 
                       dplyr::summarise(count = sum(count))
                     )
@@ -78,7 +78,7 @@ proj3YrPop <- reactive(forecast_prison_pop %>%
                           ungroup() %>% 
                           filter(key == 'forecast') %>% 
                           filter(index == floor_date(Sys.Date(),'month') + months(36)) %>% 
-                          filter(offesnse_category %in% filterOffenseType()) %>% 
+                          filter(offense_category %in% filterOffenseType()) %>% 
                           dplyr::group_by(index) %>% 
                           dplyr::mutate(count = if_else(as.Date(index)>=filterPopAdjustDateStart(), count*filterPopAdjustPct(), count)) %>% 
                           dplyr::summarise(count = pmax(sum(count),0))
@@ -88,7 +88,7 @@ proj10YrPop <- reactive(forecast_prison_pop %>%
                           ungroup() %>% 
                           filter(key == 'forecast') %>% 
                           filter(index == floor_date(Sys.Date(),'month') + months(119)) %>%
-                          filter(offesnse_category %in% filterOffenseType()) %>% 
+                          filter(offense_category %in% filterOffenseType()) %>% 
                           dplyr::group_by(index) %>% 
                           dplyr::mutate(count = if_else(as.Date(index)>=filterPopAdjustDateStart(), count*filterPopAdjustPct(), count)) %>% 
                           dplyr::summarise(count = pmax(sum(count),0))  
@@ -162,7 +162,7 @@ renderPlotly({
 
   fig <- forecast_prison_pop %>%
     filter(index > "2012-01-01") %>%
-    filter(offesnse_category %in% filterOffenseType()) %>%
+    filter(offense_category %in% filterOffenseType()) %>%
     arrange(index) %>%
     mutate(count = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), count * filterPopAdjustPct(), count),0)) %>%
     mutate(hi.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), hi.95 * filterPopAdjustPct(), hi.95),0)) %>%
