@@ -5,19 +5,19 @@ library(lubridate)
 library(timetk)
 
 ## ---- Read Data ---- ##
-admissions <- read_csv("data/Iowa_Prison_Admissions.csv", 
+admissions <- read_csv("data/december-2022/Iowa_Prison_Admissions.csv", 
                        col_types = cols(`Admission Date` = col_date(format = "%m/%d/%Y"), 
                                         `Date of Release` = col_date(format = "%m/%d/%Y"))) %>% 
   clean_names() 
 
 
-releases <- read_csv("data/Offenders_Released_from_Iowa_Prisons.csv", 
+releases <- read_csv("data/december-2022/Offenders_Released_from_Iowa_Prisons.csv", 
                      col_types = cols(`Admission Date` = col_date(format = "%m/%d/%Y"),
                                       `Release Date` = col_date(format = "%m/%d/%Y"))) %>% 
   clean_names() 
 
 
-current <- read_csv("data/Current_Iowa_Correctional_System_Prison_Population.csv", 
+current <- read_csv("data/december-2022/Current_Iowa_Correctional_System_Prison_Population.csv", 
                     col_types = cols(`Prison Start Date` = col_date(format = "%m/%d/%Y"), 
                                      `Report Date` = col_date(format = "%m/%d/%Y"))) %>% 
   clean_names() 
