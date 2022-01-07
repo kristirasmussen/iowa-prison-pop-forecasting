@@ -1,0 +1,13 @@
+name: iowa-prison-pop-forecasting
+title: iowa-prison-pop-forecasting
+username:
+account: iowa-prison-forecast
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 5257187
+bundleId: 5327689
+url: https://iowa-prison-forecast.shinyapps.io/iowa-prison-pop-forecasting/
+when: 1638640919.68134
+lastSyncTime: 1638640919.68134
+asMultiple: FALSE
+asStatic: FALSE

@@ -15,7 +15,6 @@ library(dplyr)
 library(janitor)
 library(lubridate)
 library(tidyverse)
-# library(timetk)
 library(shiny)
 library(plotly)
 
@@ -41,8 +40,7 @@ Column {.sidebar data-width=250}
 ```{r}
 offenseTypes <- forecast_prison_pop %>%
   select(offense_category) %>%
-  distinct() #%>%
-  # filter(!offense_category %in% c("None","No Charge", NA)) 
+  distinct() 
 
 selectInput("offenseType", label = h4("Offense Type"), 
     choices = sort(offenseTypes$offense_category),
@@ -111,14 +109,6 @@ renderValueBox({
   )
 })
 
-# renderValueBox({
-#   rate <- formatC(downloadRate(), digits = 1, format = "f")
-#   valueBox(
-#     value = rate,
-#     icon = "fa-area-chart",
-#     color = if (rate >= input$rateThreshold) "warning" else "primary"
-#   )
-# })
 ```
 
 ### Projected +3 Year Prison Population
@@ -157,7 +147,7 @@ Column {data-width=350, data-height=500}
 
 
 ```{r}
-#mutate(count = if_else(as.Date(index)>=filterPopAdjustDateStart(), count*filterPopAdjustPct(), count)) %>% 
+
 renderPlotly({
 
   fig <- forecast_prison_pop %>%
@@ -192,18 +182,20 @@ Column {.tabset .tabset-fade}
 ```{r}
 #Column {data-width=150}
 
+months_back = 36
+
 raceSplits <- reactive({
   df <- monthly_prison_pop %>%
           unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
           dplyr::filter(offense_category %in% filterOffenseType()) %>% 
           #dplyr::filter(offense_category=='A Felony-Violent') %>% 
-          dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years??
+          dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(months_back)) %>% #limit to last 3 years
           dplyr::group_by(offense_category, race_ethnicity) %>%
-          dplyr::summarise(n = sum(n)) %>% # we'll want to divide to get the monthly amount here too??
-          dplyr::mutate(percent = n/sum(n))%>%
+          dplyr::summarise(n = sum(n)) %>%
+          dplyr::mutate(percent = n/sum(n))%>% 
+          dplyr::mutate(avg_population = round(n/(months_back+1))) %>% #divide by number of months in window to get avg
           dplyr::ungroup() %>%
-          dplyr::select(race_ethnicity, n, percent) %>%
-          #pivot_wider(names_from = race_ethnicity, values_from = prop) %>%
+          dplyr::select(race_ethnicity, avg_population, percent) %>%
           replace(is.na(.),0) %>%
           column_to_rownames('race_ethnicity') %>%
           dplyr::mutate(percent = scales::percent(percent))
@@ -215,40 +207,19 @@ raceSplits <- reactive({
 
   })
 
-# raceProp <- reactive(raceSplits %>%
-#                        dplyr::select(c(offense_category, race_ethnicity, prop)) %>%
-#                        pivot_wider(names_from = race_ethnicity, values_from = prop)
-#                        )
-# 
-# raceN <- reactive(raceSplits %>%
-#                        dplyr::select(c(offense_category, race_ethnicity, n)) %>%
-#                        pivot_wider(names_from = race_ethnicity, values_from = n)
-#                        )
-
-
-# genderSplits <- reactive(monthly_prison_pop %>%
-#                     unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
-#                     dplyr::filter(offense_category %in% filterOffenseType()) %>% 
-#                     dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years??
-#                     dplyr::group_by(offense_category, sex) %>%
-#                     dplyr::summarise(n = sum(n)) %>% # we'll want to divide to get the monthly amount here too??
-#                     dplyr::mutate(prop = n/sum(n))%>%
-#                     #dplyr::select(c(offense_category, sex, prop)) %>%
-#                     #pivot_wider(names_from = sex, values_from = prop) %>%
-#                     replace(is.na(.),0))
 
 genderSplits <- reactive({
   df <- monthly_prison_pop %>%
           unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
           dplyr::filter(offense_category %in% filterOffenseType()) %>% 
           #dplyr::filter(offense_category=='A Felony-Violent') %>% 
-          dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years??
+          dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years
           dplyr::group_by(offense_category, sex) %>%
-          dplyr::summarise(n = sum(n)) %>% # we'll want to divide to get the monthly amount here too??
+          dplyr::summarise(n = sum(n)) %>%
           dplyr::mutate(percent = n/sum(n))%>%
+          dplyr::mutate(avg_population = round(n/(months_back+1))) %>% #divide by number of months in window to get avg
           dplyr::ungroup() %>%
-          dplyr::select(sex, n, percent) %>%
-          #pivot_wider(names_from = race_ethnicity, values_from = prop) %>%
+          dplyr::select(sex, avg_population, percent) %>%
           replace(is.na(.),0) %>%
           column_to_rownames('sex') %>%
           dplyr::mutate(percent = scales::percent(percent))
@@ -259,29 +230,6 @@ genderSplits <- reactive({
           rownames_to_column('Metric')
 
   })
-
-# renderTable(genderSplits)
-
-
-#demoSplits <- reactive(merge(genderSplits(), raceSplits()))
-
-# renderDataTable(genderSplits(), 
-#                 escape = TRUE, 
-#                 options = list(scrollX=FALSE, autoWidth=TRUE, paging=FALSE, info=FALSE, searching=FALSE, ordering=FALSE))
-# 
-# renderDataTable(raceSplits(), 
-#                 escape = TRUE, 
-#                 options = list(scrollX=FALSE, autoWidth=TRUE, paging=FALSE, info=FALSE, searching=FALSE, ordering=FALSE))
-
-# renderDataTable(genderSplits,
-#                 options = list(
-#                   iDisplayLength=1,
-#                   bLengthChange=0,
-#                   bPaginate=0,
-#                   bFilter=0,
-#                   bInfo=0,
-#                   bAutoWidth=1
-#                 ))
 
 ```
 
@@ -303,7 +251,6 @@ renderDataTable(raceSplits(),
 renderDataTable(genderSplits(), 
                 escape = TRUE, 
                 options = list(scrollX=TRUE, autoWidth=TRUE, autoHeight=TRUE, paging=FALSE, info=FALSE, searching=FALSE, ordering=FALSE))
-
 
 ```
 
