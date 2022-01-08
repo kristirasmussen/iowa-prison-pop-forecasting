@@ -4,6 +4,7 @@ library(tidyquant)
 library(timetk)
 library(sweep)
 library(forecast)
+library(openxlsx)
 
 # import functions
 fill_dates <- function(data,dates_begin="2012-01-01",dates_end="2021-11-01") {
@@ -21,14 +22,14 @@ fill_dates <- function(data,dates_begin="2012-01-01",dates_end="2021-11-01") {
 # Loading data
 load("/Users/grantruedy/Georgia_Tech/CSE_6242/Project/monthly_prison_pop.rda")
 
-# df <- monthly_prison_pop %>% group_by(ds) %>% summarize(count = sum(n))
+#df <- monthly_prison_pop #%>% group_by(ds) %>% summarize(count = sum(n))
 
 length(unique(monthly_prison_pop$offense_classifications))
 table(monthly_prison_pop$offense_classifications)
 
 # Filtering Other misdemanor for now, because of low frequency (only 1)
 df <- monthly_prison_pop %>% 
-  filter(!offense_classifications %in% c("None","No Charge", 'Other Misdemeanor', 'Felony - Enhancement to Original Penalty', NA))
+filter(!offense_classifications %in% c("None","No Charge", 'Other Misdemeanor', 'Felony - Enhancement to Original Penalty', NA))
 # table(df$offense_classifications)
 
 
@@ -38,7 +39,7 @@ df <- monthly_prison_pop %>%
 # aggregate offense_classifications and offense_types in one column and sum up the population
 df_grouped <- df %>% 
   rename(date = ds) %>%
-  unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
+  unite(offense_category, c(offense_classifications,offense_types, offense_subtypes), sep = "-") %>%
   group_by(date, offense_category) %>% 
   summarize(count = sum(n))
 
@@ -71,8 +72,8 @@ fun <- function(x) {auto.arima(x, D=1)}
 fun1 <- function(x) {accuracy(auto.arima(x, D=1))}
 
 df_fit <- df_ts %>%
-  mutate(fit.ets =  purrr::map(data.ts, fun)) %>% 
-  mutate(acc = purrr::map(data.ts, fun1)) 
+  mutate(fit.ets =  purrr::map(data.ts, fun)) #%>% 
+  #mutate(acc = purrr::map(data.ts, fun1)) 
 
 df_performance <- df_fit %>% select(offense_category, acc) %>% 
   unnest_wider(acc) 
@@ -123,6 +124,13 @@ df_new$count <- if_else(df_new$count < 0, 0, df_new$count)
 df_new$lo.95 <- if_else(df_new$lo.95 < 0, 0, df_new$lo.95)
 df_new$hi.95 <- if_else(df_new$hi.95 < 0, 0, df_new$hi.95)
 
+df_forecast <- df_new %>% separate(offense_category, into = c('offense_classifications', 'offense_types', 'offense_subtypes'), 
+                             sep = "-") 
+
+save(df_forecast, file = 'all_levels_forecast.rda')
+##stop here 
+
+
 save(df_new, file = 'arima_seasonality_after_2012_zeros.rda')
 
 ############ Plotting #################################################################################
@@ -143,3 +151,20 @@ df_new %>% filter(offense_category %in% 'Aggravated Misdemeanor-Other') %>%
   #facet_wrap(~ offense_category, scales = "free_y", ncol = 3) +
   theme_tq() 
 #theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+load("/Users/grantruedy/Georgia_Tech/CSE_6242/Project/df_performance_seasonality.rda")
+df_performance_seasonality <- df_performance
+load("/Users/grantruedy/Georgia_Tech/CSE_6242/Project/df_performance_no_seasonality.rda")
+df_performance_no_seasonality <- df_performance
+
+df_performance_seasonality$Seasonality <- 'Seasonal Difference'
+df_performance_no_seasonality$Seasonality <- 'No Seasonal Difference'
+
+combined <- union_all(df_performance_seasonality,df_performance_no_seasonality)
+final <- combined %>% separate(offense_category, into = c('offense_classifications', 'offense_types'), 
+                    sep = "-") 
+write.xlsx(final, 'final_performance.xlsx')
+
+
+
+
