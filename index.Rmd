@@ -22,8 +22,12 @@ library(plotly)
 load("./data/monthly_prison_pop.rda")
 
 # Forecast Data
-load("./data/arima_seasonality_after_2012_zeros.rda") 
-forecast_prison_pop <- df_new
+# load("./data/Archive/arima_seasonality_after_2012_zeros.rda") 
+# load("./data/all_levels_forecast_covid.rda")
+# forecast_prison_pop <- df_forecast_march2020
+
+load("./data/all_levels_forecast.rda")
+forecast_prison_pop <- df_forecast_jan2022
 
 # Identify first forecast data for Adjustment Start Date filtering functionality
 firstForecastDate <- forecast_prison_pop %>%
@@ -38,28 +42,54 @@ Column {.sidebar data-width=250}
 -----------------------------------------------------------------------
 
 ```{r}
-offenseTypes <- forecast_prison_pop %>%
-  select(offense_category) %>%
+offenseClasss <- forecast_prison_pop %>%
+  select(offense_classifications) %>%
   distinct() 
 
-selectInput("offenseType", label = h4("Offense Type"), 
-    choices = sort(offenseTypes$offense_category),
+selectInput("offenseClass", label = h4("Offense Classification"), 
+    choices = sort(offenseClasss$offense_classifications),
     selected = 'A Felony-Violent',
     multiple = F)
 
-numericInput("popAdjustPct", 
-             label = h4("Population Adjustment Percent (percent change in (+/- X.XX%) format)"), 
+offenseType <- forecast_prison_pop %>%
+  select(offense_types) %>%
+  distinct() 
+
+selectInput("offenseType", label = h4("Offense Type"), 
+    choices = sort(offenseType$offense_types),
+    selected = 'Violent',
+    multiple = F)
+
+offenseSubtype <- forecast_prison_pop %>%
+  select(offense_subtypes) %>%
+  distinct() 
+
+selectInput("offenseSubtype", label = h4("Offense Subtype"), 
+    choices = sort(offenseSubtype$offense_subtypes),
+    selected = 'Kidnap',
+    multiple = F)
+
+numericInput("popAdjustNum", 
+             label = h4("Population Adjustment Number (+/-)"), 
              value = 0)
+
+# numericInput("popAdjustPct", 
+#              label = h4("Population Adjustment Percent (percent change in (+/- X.XX%) format)"), 
+#              value = 0)
 
 dateInput("popAdjustDateStart", 
              label = h4("Population Adjustment Effective Date"), 
              value = as.Date('2021-12-01'))
 
-filterOffenseType <- reactive(input$offenseType)
+filteroffenseClass <- reactive(input$offenseClass)
+filteroffenseType <- reactive(input$offenseType)
+filteroffenseSubtype <- reactive(input$offenseSubtype)
 #Pop adjustment input value - default to 0 if empty
-filterPopAdjust <- reactive(ifelse(is.na(input$popAdjustPct),0,input$popAdjustPct))
+filterPopAdjustNum <- reactive(ifelse(is.na(input$popAdjustNum),0,input$popAdjustNum))
+# filterPopAdjust <- reactive(ifelse(is.na(input$popAdjustPct),0,input$popAdjustPct))
 #Convert adjustment value to decimal format, add 1 (e.g., +5% -> 1.05)
-filterPopAdjustPct <- reactive(1 + as.double(filterPopAdjust())/100)
+# filterPopAdjustPct <- reactive(1 + as.double(filterPopAdjust())/100)
+# filterPopAdjustPct <- reactive(1 + as.double(filterPopAdjust())/100)
 #Adjustment value effective date
 filterPopAdjustDateStart <- reactive(as.Date(input$popAdjustDateStart))
 
@@ -67,7 +97,9 @@ currPop <- reactive(forecast_prison_pop %>%
                       ungroup() %>% 
                       filter(key == 'actual') %>% 
                       filter(index == max(index)) %>% 
-                      filter(offense_category %in% filterOffenseType()) %>% 
+                      filter(offense_classifications %in% filteroffenseClass()) %>% 
+                      filter(offense_types %in% filteroffenseType()) %>% 
+                      filter(offense_subtypes %in% filteroffenseSubtype()) %>% 
                       dplyr::group_by(index) %>% 
                       dplyr::summarise(count = sum(count))
                     )
@@ -76,9 +108,12 @@ proj3YrPop <- reactive(forecast_prison_pop %>%
                           ungroup() %>% 
                           filter(key == 'forecast') %>% 
                           filter(index == floor_date(Sys.Date(),'month') + months(36)) %>% 
-                          filter(offense_category %in% filterOffenseType()) %>% 
+                          filter(offense_classifications %in% filteroffenseClass()) %>% 
+                          filter(offense_types %in% filteroffenseType()) %>% 
+                          filter(offense_subtypes %in% filteroffenseSubtype()) %>% 
                           dplyr::group_by(index) %>% 
-                          dplyr::mutate(count = if_else(as.Date(index)>=filterPopAdjustDateStart(), count*filterPopAdjustPct(), count)) %>% 
+                          # dplyr::mutate(count = if_else(as.Date(index)>=filterPopAdjustDateStart(), count*filterPopAdjustPct(), count)) %>% 
+                          dplyr::mutate(count = if_else(as.Date(index)>=filterPopAdjustDateStart(), count+filterPopAdjustNum(), count)) %>% 
                           dplyr::summarise(count = pmax(sum(count),0))
                     )
 
@@ -86,9 +121,12 @@ proj10YrPop <- reactive(forecast_prison_pop %>%
                           ungroup() %>% 
                           filter(key == 'forecast') %>% 
                           filter(index == floor_date(Sys.Date(),'month') + months(119)) %>%
-                          filter(offense_category %in% filterOffenseType()) %>% 
+                          filter(offense_classifications %in% filteroffenseClass()) %>% 
+                          filter(offense_types %in% filteroffenseType()) %>% 
+                          filter(offense_subtypes %in% filteroffenseSubtype()) %>% 
                           dplyr::group_by(index) %>% 
-                          dplyr::mutate(count = if_else(as.Date(index)>=filterPopAdjustDateStart(), count*filterPopAdjustPct(), count)) %>% 
+                          # dplyr::mutate(count = if_else(as.Date(index)>=filterPopAdjustDateStart(), count*filterPopAdjustPct(), count)) %>% 
+                          dplyr::mutate(count = if_else(as.Date(index)>=filterPopAdjustDateStart(), count+filterPopAdjustNum(), count)) %>% 
                           dplyr::summarise(count = pmax(sum(count),0))  
                     )
 
@@ -152,16 +190,18 @@ renderPlotly({
 
   fig <- forecast_prison_pop %>%
     filter(index > "2012-01-01") %>%
-    filter(offense_category %in% filterOffenseType()) %>%
+    filter(offense_classifications %in% filteroffenseClass()) %>%
+    filter(offense_types %in% filteroffenseType()) %>% 
+    filter(offense_subtypes %in% filteroffenseSubtype()) %>% 
     arrange(index) %>%
-    mutate(count = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), count * filterPopAdjustPct(), count),0)) %>%
-    mutate(hi.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), hi.95 * filterPopAdjustPct(), hi.95),0)) %>%
-    mutate(lo.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), lo.95 * filterPopAdjustPct(), lo.95),0)) %>%
+    mutate(count = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), count + filterPopAdjustNum(), count),0)) %>%
+    mutate(hi.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), hi.95 + filterPopAdjustNum(), hi.95),0)) %>%
+    mutate(lo.95 = pmax(if_else(key == "forecast" & as.Date(index)>=filterPopAdjustDateStart(), lo.95 + filterPopAdjustNum(), lo.95),0)) %>%
     #Upper 95% Confidence Line
     plot_ly(x = ~index, y = ~ hi.95, type = "scatter", mode='lines', line = list(color = 'transparent'), hoverinfo = "x+y", showlegend = F) %>% 
     layout(xaxis = list(title = "Date"), 
            yaxis = list(title = "Count of Incarcerated Individuals", rangemode = "tozero")
-           ,title = paste0("All Data Predictions - ", filterOffenseType(), " (with 95% CI)"))
+           ,title = paste0("All Data Predictions - ", filteroffenseClass(), " - " ,filteroffenseType(), " - ", filteroffenseSubtype(), " (with 95% CI)"))
   #Lower 95% Confidence Line
   fig <- fig %>% 
     add_trace(y = ~lo.95, mode = 'lines', fill = 'tonexty', fillcolor='rgba(0,100,80,0.2)', line = list(color = 'transparent')) 
@@ -186,11 +226,13 @@ months_back = 36
 
 raceSplits <- reactive({
   df <- monthly_prison_pop %>%
-          unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
-          dplyr::filter(offense_category %in% filterOffenseType()) %>% 
-          #dplyr::filter(offense_category=='A Felony-Violent') %>% 
+          # unite(offense_classifications, c(offense_classifications,offense_types), sep = "-") %>%
+          dplyr::filter(offense_classifications %in% filteroffenseClass()) %>% 
+          dplyr::filter(offense_types %in% filteroffenseType()) %>% 
+          dplyr::filter(offense_subtypes %in% filteroffenseSubtype()) %>% 
+          #dplyr::filter(offense_classificationsgory=='A Felony-Violent') %>% 
           dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(months_back)) %>% #limit to last 3 years
-          dplyr::group_by(offense_category, race_ethnicity) %>%
+          dplyr::group_by(offense_classifications,offense_types,offense_subtypes,race_ethnicity) %>%
           dplyr::summarise(n = sum(n)) %>%
           dplyr::mutate(percent = n/sum(n))%>% 
           dplyr::mutate(avg_population = round(n/(months_back+1))) %>% #divide by number of months in window to get avg
@@ -210,11 +252,13 @@ raceSplits <- reactive({
 
 genderSplits <- reactive({
   df <- monthly_prison_pop %>%
-          unite(offense_category, c(offense_classifications,offense_types), sep = "-") %>%
-          dplyr::filter(offense_category %in% filterOffenseType()) %>% 
-          #dplyr::filter(offense_category=='A Felony-Violent') %>% 
+          # unite(offense_classifications, c(offense_classifications,offense_types), sep = "-") %>%
+          dplyr::filter(offense_classifications %in% filteroffenseClass()) %>%
+          dplyr::filter(offense_types %in% filteroffenseType()) %>% 
+          dplyr::filter(offense_subtypes %in% filteroffenseSubtype()) %>% 
+          #dplyr::filter(offense_classifications=='A Felony-Violent') %>% 
           dplyr::filter(ds >= floor_date(Sys.Date(),'month') - months(36)) %>% #limit to last 3 years
-          dplyr::group_by(offense_category, sex) %>%
+          dplyr::group_by(offense_classifications,offense_types,offense_subtypes,sex) %>%
           dplyr::summarise(n = sum(n)) %>%
           dplyr::mutate(percent = n/sum(n))%>%
           dplyr::mutate(avg_population = round(n/(months_back+1))) %>% #divide by number of months in window to get avg
